@@ -97,7 +97,13 @@ async function contentDelta(actor: Actor, since?: Date) {
     orderBy: { startsAt: "asc" },
     take: 100,
   });
-  return { posts: posts.filter((p) => canSeePost(actor, p, elderOf)), events };
+  // Archived (sorry business) and rejected posts become removal notices, so offline caches drop them.
+  const gone = (p: (typeof posts)[number]) => !!p.archivedAt || p.status === "rejected";
+  return {
+    posts: posts.filter((p) => !gone(p) && canSeePost(actor, p, elderOf)),
+    removedPostIds: posts.filter(gone).map((p) => p.id),
+    events,
+  };
 }
 
 export async function fullSync(actor: Actor, input: z.infer<typeof syncInput>) {
@@ -105,13 +111,14 @@ export async function fullSync(actor: Actor, input: z.infer<typeof syncInput>) {
   const results = await applyMutations(actor, input.mutations);
   const since = parseCursor(input.cursor);
   await recordActivity(actor);
-  const { posts, events } = await contentDelta(actor, since);
+  const { posts, events, removedPostIds } = await contentDelta(actor, since);
   return {
     cursor: serverTime.toISOString(),
     serverTime,
     results,
     appointments: await visibleAppointments(actor, since),
     posts: await serializePosts(actor, posts),
+    removedPostIds,
     events: await serializeEvents(actor, events),
     ...(await relationships(actor)),
   };
@@ -147,7 +154,7 @@ export async function liteSync(actor: Actor, input: z.infer<typeof syncInput>) {
     orderBy: { startsAt: "asc" },
     take: 20,
   });
-  const { posts, events } = await contentDelta(actor, since);
+  const { posts, events, removedPostIds } = await contentDelta(actor, since);
   const notices = posts.filter(
     (p) => p.status === "published" && (p.urgent || p.kind === "sorry_business"),
   );
@@ -179,6 +186,7 @@ export async function liteSync(actor: Actor, input: z.infer<typeof syncInput>) {
       body: p.body.length > LITE_BODY_CHARS ? `${p.body.slice(0, LITE_BODY_CHARS - 1)}…` : p.body,
       createdAt: p.createdAt,
     })),
+    removedPostIds,
     deferred: { posts: posts.length - notices.length, events: events.length },
   };
 }

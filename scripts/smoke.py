@@ -116,6 +116,21 @@ members = call("GET", f"/api/groups/{salt}/members", token=grace)
 check(any(m["user"]["name"] == "Jordan Miller" for m in members), "Elder sees the member list")
 expect_status("GET", f"/api/groups/{salt}/members", 403, token=leah)
 
+jm = next(m for m in members if m["user"]["name"] == "Jordan Miller")
+call("POST", f"/api/memberships/{jm['id']}/custodian", {"canTranslate": True}, grace)
+members = call("GET", f"/api/groups/{salt}/members", token=grace)
+check(next(m for m in members if m["id"] == jm["id"])["canTranslate"], "Elder appoints a language custodian")
+call("POST", f"/api/memberships/{jm['id']}/custodian", {"canTranslate": False}, grace)
+
+# A rejected post reaches its author's offline cache as a removal, not a post.
+before = call("POST", "/api/sync", {"mutations": []}, jordan)["cursor"]
+junk = call("POST", f"/api/groups/{salt}/posts", {"body": "Selling raffle tickets", "clientMutationId": cmid()}, jordan)
+call("POST", f"/api/posts/{junk['id']}/reject", {}, grace)
+delta = call("POST", "/api/sync", {"cursor": before, "mutations": []}, jordan)
+check(junk["id"] in delta["removedPostIds"] and all(p["id"] != junk["id"] for p in delta["posts"]), "Rejected post sent as a removal")
+lite = call("POST", "/api/sync/lite", {"cursor": before, "mutations": []}, jordan)
+check(junk["id"] in lite["removedPostIds"], "Lite sync carries removals too")
+
 # Community language: published demo language serves web and iOS strings separately.
 langs = call("GET", "/api/i18n")
 check(any(l["code"] == "qaa" and l["status"] == "published" for l in langs), "Community language is offered")

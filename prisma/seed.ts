@@ -8,7 +8,7 @@
  * insights have a story to illustrate. These are illustrations, not findings.
  */
 import "dotenv/config";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../generated/prisma/client";
@@ -423,7 +423,8 @@ async function main() {
     ...Object.entries(readJson("app.en.json") as Record<string, string>).map(([k, v]): [string, string] => [`app:${k}`, v]),
   ];
   const translations = sources
-    .map(([key, english], i) => ({ key, english, slot: i % 12 }))
+    // Status is chosen from a hash of the key, so adding strings never reshuffles which are translated.
+    .map(([key, english]) => ({ key, english, slot: createHash("sha1").update(key).digest()[0] % 12 }))
     // Most strings approved, some drafts waiting for an Elder, a few missing (they show in English).
     .filter((x) => x.slot !== 11)
     .map((x) => ({

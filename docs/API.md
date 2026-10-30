@@ -38,6 +38,7 @@ Membership { id, groupId, groupName, groupType, communityId, role: "member"|"eld
 | POST | `/api/memberships/:id/approve` | Elder only |
 | POST | `/api/memberships/:id/reject` | Elder only |
 | POST | `/api/memberships/:id/remove` | Elder only |
+| POST | `/api/memberships/:id/custodian` | Elder only. `{ canTranslate }`: appoint or stand down a language custodian |
 | POST | `/api/memberships/:id/guardian-consent` | The young person's guardian only. Required before an Elder can approve an under-18 join (approve returns 409 until then) |
 | POST | `/api/posts/:id/approve` | Elder only. Optional `{ pinned }` |
 | POST | `/api/posts/:id/reject` | Elder only |
@@ -138,15 +139,14 @@ Full sync response:
 ```
 { cursor, serverTime,
   results: [{ clientMutationId, status: "applied"|"duplicate"|"rejected", entityId?, error? }],
-  appointments: Appointment[], posts: Post[], events: Event[], memberships: Membership[],
-  carers: { myCarers, caringFor } }
+  appointments: Appointment[], posts: Post[], removedPostIds: string[], events: Event[],
+  memberships: Membership[], carers: { myCarers, caringFor } }
 ```
 
 Omit `cursor` for a full snapshot; pass the returned `cursor` next time to get
-only changes since then. Appointments are server-wins. Deletions are not sent:
-your own rejected post comes back with `status: "rejected"`; other removals
-(archived sorry business, hidden comments) drop out of the next group feed or
-comments fetch.
+only changes since then. Appointments are server-wins. `removedPostIds` lists posts archived (sorry business) or rejected since the
+cursor; drop them from caches. Hidden comments drop out of the next comments
+fetch.
 
 Lite response (`/api/sync/lite`, gzip, target < 5 KB) uses the same keys but
 only text and minimal fields, in priority order:
@@ -155,6 +155,7 @@ only text and minimal fields, in priority order:
 { cursor, serverTime, lite: true, results,
   appointments: LiteAppointment[],    // { id, startsAt, location, type, status, providerName, isMine, updatedAt }
   notices: LiteNotice[],              // urgent + sorry business only: { id, groupId, kind, title?, body (≤280 chars), createdAt }
+  removedPostIds: string[],           // drop these from any cache
   deferred: { posts: number, events: number } }  // counts of changes waiting for normal coverage
 ```
 
