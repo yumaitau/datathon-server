@@ -54,7 +54,7 @@ GroupSummary { id, name, type, parentName?, memberCount }
 Post  { id, groupId, groupName, author: { id, name }, kind: "announcement"|"general"|"sorry_business",
         title?, body, hasMedia, imageUrl? /* null for sorry business; never fetch over satellite */, status: "pending"|"published"|"rejected", pinned, urgent,
         restrictGender?, minAge?, deceasedWarning, commentsEnabled, threadLocked,
-        commentCount, reactions: { like, heart, thinking_of_you }, myReactions: string[],
+        commentCount, reactions: { like, heart, thinking_of_you, deadly, aboriginal_flag }, myReactions: string[],
         createdAt, updatedAt }
 Event { id, groupId, groupName, title, description?, category, startsAt, endsAt?, location,
         providerName?, cancelled, commentsEnabled, threadLocked,
@@ -83,7 +83,7 @@ media until the viewer taps through.
 
 ```
 Comment { id, author: { id, name }, body, parentCommentId?, status,
-          reactions: { like, heart, thinking_of_you }, myReactions: string[], createdAt, replies: Comment[] }
+          reactions: { like, heart, thinking_of_you, deadly, aboriginal_flag }, myReactions: string[], createdAt, replies: Comment[] }
 ```
 
 Replies are one level deep: replying to a reply attaches to its top-level parent.
@@ -191,3 +191,9 @@ English rules for codes they don't know.
 | GET | `/api/health` | `{ ok }`; 503 when the database is unreachable |
 | GET | `/api/elder/export?groupId=&format=json\|csv` | Elder only. Community data export (members, posts, events; never health data) |
 | POST | `/api/cron/reminders` | `Authorization: Bearer $CRON_SECRET`. Sends due reminders and archives sorry business notices older than 14 days → `{ due, sent, archivedSorryBusiness }` |
+
+Reaction kinds: `like`, `heart`, `thinking_of_you`, `deadly`, `aboriginal_flag`.
+Apply the additive `20261031010000_add_reactions` migration before deploying
+clients that send the new kinds. Older cached counts omit them and decode as zero.
+Rollback: roll back the application while leaving the additive enum values in place;
+do not drop existing reaction rows to remove enum values.

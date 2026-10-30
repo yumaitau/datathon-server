@@ -355,6 +355,8 @@ enum ReactionKind {
   like
   heart
   thinking_of_you
+  deadly
+  aboriginal_flag
 }
 
 model Reaction {

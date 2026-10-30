@@ -57,8 +57,8 @@ export async function loadVisibleEvent(actor: Actor, eventId: string) {
   return { event, elderOf };
 }
 
-type ReactionCounts = { like: number; heart: number; thinking_of_you: number };
-const emptyReactions = (): ReactionCounts => ({ like: 0, heart: 0, thinking_of_you: 0 });
+type ReactionCounts = { like: number; heart: number; thinking_of_you: number; deadly: number; aboriginal_flag: number };
+const emptyReactions = (): ReactionCounts => ({ like: 0, heart: 0, thinking_of_you: 0, deadly: 0, aboriginal_flag: 0 });
 
 async function reactionSummary(targetType: "post" | "comment" | "event", ids: string[], userId: string) {
   const counts = new Map<string, ReactionCounts>();

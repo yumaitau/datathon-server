@@ -133,7 +133,7 @@ export async function rsvp(actor: Actor, input: z.infer<typeof rsvpInput>, clien
 export const reactionInput = z.object({
   targetType: z.enum(["post", "comment", "event"]),
   targetId: z.string(),
-  kind: z.enum(["like", "heart", "thinking_of_you"]),
+  kind: z.enum(["like", "heart", "thinking_of_you", "deadly", "aboriginal_flag"]),
   /** Explicit state for queued writes; omitted means toggle. */
   active: z.boolean().optional(),
 });
@@ -165,7 +165,7 @@ export async function react(actor: Actor, input: z.infer<typeof reactionInput>) 
     where: { targetType: input.targetType, targetId: input.targetId },
     _count: true,
   });
-  const counts = { like: 0, heart: 0, thinking_of_you: 0 };
+  const counts = { like: 0, heart: 0, thinking_of_you: 0, deadly: 0, aboriginal_flag: 0 };
   for (const r of rows) counts[r.kind] = r._count;
   return { active: want, counts };
 }
