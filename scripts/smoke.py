@@ -112,6 +112,18 @@ ev = next(e for e in feed["events"] if not e["cancelled"])
 rs = call("POST", f"/api/events/{ev['id']}/rsvp", {"response": "going", "clientMutationId": cmid()}, leah)
 check(rs["response"] == "going", "RSVP going")
 
+members = call("GET", f"/api/groups/{salt}/members", token=grace)
+check(any(m["user"]["name"] == "Jordan Miller" for m in members), "Elder sees the member list")
+expect_status("GET", f"/api/groups/{salt}/members", 403, token=leah)
+
+# Community language: published demo language serves web and iOS strings separately.
+langs = call("GET", "/api/i18n")
+check(any(l["code"] == "qaa" and l["status"] == "published" for l in langs), "Community language is offered")
+ios = call("GET", "/api/i18n/qaa?platform=ios")
+check(ios["platform"] == "ios" and ios["strings"].get("Community", "").startswith("⟦"), "iOS strings served by source key")
+web = call("GET", "/api/i18n/qaa")
+check(not any(k.startswith("app:") for k in web["strings"]), "Web pack has no app strings")
+
 # ---------- Flow B: clinic to patient (appointment visibility + offline sync) ----------
 appts = call("GET", "/api/appointments", token=leah)
 check(len(appts["mine"]) > 0, "Leah sees her appointments")

@@ -44,11 +44,14 @@ Membership { id, groupId, groupName, groupType, communityId, role: "member"|"eld
 | POST | `/api/posts/:id/pin` | Elder only. `{ pinned: boolean }` |
 | POST | `/api/posts/:id/settings` | Elder only. `{ commentsEnabled?, threadLocked?, deceasedWarning? }` |
 | POST | `/api/provider-access/:id/decide` | Elder only. `{ decision: "approved"\|"rejected" }` |
+| GET | `/api/groups/:id/members` | Elder only. `[{ id /* membership */, user: { id, name, isMinor }, role, canTranslate, joinedAt }]`; remove with `/api/memberships/:id/remove` |
+| POST | `/api/reports/:id/dismiss` | Elder only. Keeps the comment and closes the report |
+| POST | `/api/events/:id/settings` | Elder only. `{ commentsEnabled?, threadLocked? }` → `Event` |
 
 ```
 GroupSummary { id, name, type, parentName?, memberCount }
 Post  { id, groupId, groupName, author: { id, name }, kind: "announcement"|"general"|"sorry_business",
-        title?, body, hasMedia, status: "pending"|"published"|"rejected", pinned, urgent,
+        title?, body, hasMedia, imageUrl? /* null for sorry business; never fetch over satellite */, status: "pending"|"published"|"rejected", pinned, urgent,
         restrictGender?, minAge?, deceasedWarning, commentsEnabled, threadLocked,
         commentCount, reactions: { like, heart, thinking_of_you }, myReactions: string[],
         createdAt, updatedAt }
@@ -78,7 +81,8 @@ media until the viewer taps through.
 | POST | `/api/reactions` | `{ targetType: "post"\|"comment"\|"event", targetId, kind }` toggles → `{ active, counts }` |
 
 ```
-Comment { id, author: { id, name }, body, parentCommentId?, status, createdAt, replies: Comment[] }
+Comment { id, author: { id, name }, body, parentCommentId?, status,
+          reactions: { like, heart, thinking_of_you }, myReactions: string[], createdAt, replies: Comment[] }
 ```
 
 Replies are one level deep: replying to a reply attaches to its top-level parent.
@@ -122,7 +126,7 @@ Mutation { clientMutationId: string, type: MutationType, payload: object, create
 | --- | --- |
 | `rsvp` | `{ eventId, response }` |
 | `confirmAppointment` | `{ appointmentId }` |
-| `createPost` | `{ groupId, body, title?, kind? }` |
+| `createPost` | `{ groupId, body, title?, kind?, urgent?, restrictGender?, minAge?, deceasedWarning? }` (`urgent` and `deceasedWarning` take effect only on Elders' posts) |
 | `createComment` | `{ postId? , eventId?, parentCommentId?, body }` |
 | `reaction` | `{ targetType, targetId, kind }` |
 
@@ -139,7 +143,10 @@ Full sync response:
 ```
 
 Omit `cursor` for a full snapshot; pass the returned `cursor` next time to get
-only changes since then. Appointments are server-wins.
+only changes since then. Appointments are server-wins. Deletions are not sent:
+your own rejected post comes back with `status: "rejected"`; other removals
+(archived sorry business, hidden comments) drop out of the next group feed or
+comments fetch.
 
 Lite response (`/api/sync/lite`, gzip, target < 5 KB) uses the same keys but
 only text and minimal fields, in priority order:
