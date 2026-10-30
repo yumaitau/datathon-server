@@ -38,6 +38,7 @@ Membership { id, groupId, groupName, groupType, communityId, role: "member"|"eld
 | POST | `/api/memberships/:id/approve` | Elder only |
 | POST | `/api/memberships/:id/reject` | Elder only |
 | POST | `/api/memberships/:id/remove` | Elder only |
+| POST | `/api/memberships/:id/guardian-consent` | The young person's guardian only. Required before an Elder can approve an under-18 join (approve returns 409 until then) |
 | POST | `/api/posts/:id/approve` | Elder only. Optional `{ pinned }` |
 | POST | `/api/posts/:id/reject` | Elder only |
 | POST | `/api/posts/:id/pin` | Elder only. `{ pinned: boolean }` |
@@ -157,6 +158,7 @@ The response header `X-Payload-Bytes` reports the uncompressed size and
 
 | Method | Path | Notes |
 | --- | --- | --- |
+| GET | `/api/services` | Service directory: `[{ id, name, type, address, phone?, lat, lng }]`. Cache for offline use |
 | GET | `/api/health` | `{ ok }`; 503 when the database is unreachable |
 | GET | `/api/elder/export?groupId=&format=json\|csv` | Elder only. Community data export (members, posts, events; never health data) |
-| POST | `/api/cron/reminders` | `Authorization: Bearer $CRON_SECRET`. Sends due reminders → `{ due, sent }` |
+| POST | `/api/cron/reminders` | `Authorization: Bearer $CRON_SECRET`. Sends due reminders and archives sorry business notices older than 14 days → `{ due, sent, archivedSorryBusiness }` |

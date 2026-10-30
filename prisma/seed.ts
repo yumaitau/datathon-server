@@ -253,7 +253,7 @@ async function main() {
     posts.push({
       id: id(), communityId: c.id, groupId: c.id, authorId: elder.id, kind: "sorry_business",
       title: "Sorry business", body: "The family asks for privacy during sorry business. Services will be shared with family directly. Please keep the family in your thoughts.",
-      status: "published", commentsEnabled: false, deceasedWarning: true, decidedById: elder.id, decidedAt: daysAgo(20), createdAt: daysAgo(20), updatedAt: daysAgo(20),
+      status: "published", commentsEnabled: false, deceasedWarning: true, decidedById: elder.id, decidedAt: daysAgo(5), createdAt: daysAgo(5), updatedAt: daysAgo(5),
     });
   }
   // A pinned welcome post and one pending member post in each community.
