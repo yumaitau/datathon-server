@@ -64,6 +64,11 @@ function randomPerson(): U {
 }
 
 async function main() {
+  // `--if-empty` (used by the Docker entrypoint) keeps an existing demo database.
+  if (process.argv.includes("--if-empty") && (await db.user.count()) > 0) {
+    console.log("Database already has data; skipping seed.");
+    return;
+  }
   await reset();
 
   // ---------- Groups ----------
@@ -143,7 +148,8 @@ async function main() {
 
   // ---------- Providers ----------
   // Invented services placed so Ironbark Ridge sits much further from dental, hospital and legal help.
-  const town = { lat: -23.69, lng: 133.88 };
+  // Fictional regional town, deliberately placed away from any real labelled town.
+  const town = { lat: -24.15, lng: 133.35 };
   const providers = [
     { id: id(), name: "Saltbush Creek Health Service", type: "clinic", address: "2 Clinic Rd, Saltbush Creek", phone: "+61889000001", lat: -22.955, lng: 134.585, verified: true },
     { id: id(), name: "Ironbark Ridge Nurse Post", type: "clinic", address: "1 Main St, Ironbark Ridge", phone: "+61889000002", lat: -21.418, lng: 136.072, verified: true },

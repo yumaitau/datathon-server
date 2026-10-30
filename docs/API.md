@@ -152,3 +152,11 @@ only text and minimal fields, in priority order:
 
 The response header `X-Payload-Bytes` reports the uncompressed size and
 `X-Compressed-Bytes` the gzip size, for the demo network log.
+
+## Other endpoints
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| GET | `/api/health` | `{ ok }`; 503 when the database is unreachable |
+| GET | `/api/elder/export?groupId=&format=json\|csv` | Elder only. Community data export (members, posts, events; never health data) |
+| POST | `/api/cron/reminders` | `Authorization: Bearer $CRON_SECRET`. Sends due reminders → `{ due, sent }` |

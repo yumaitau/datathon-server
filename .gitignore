@@ -43,3 +43,6 @@ next-env.d.ts
 /generated/prisma
 
 !.env.example
+
+# copied from node_modules by scripts/copy-map-worker.mjs
+/public/maplibre-gl-worker.mjs

@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Generated: Prisma client and the copied MapLibre worker.
+    "generated/**",
+    "public/maplibre-gl-worker.mjs",
   ]),
 ]);
 

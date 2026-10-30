@@ -93,12 +93,26 @@ function timePhrase(at: Date, now = new Date()) {
   return `on ${date} at ${time}`;
 }
 
-/** Generic copy only: phones are shared, so never name the appointment type. */
-export function reminderText(at: Date, recipient: "self" | "carer", now = new Date()) {
-  const when = timePhrase(at, now);
+/** "+61889000001" -> "08 8900 0001" for SMS copy. */
+export function localPhone(e164: string) {
+  const d = e164.replace(/^\+61/, "0");
+  return d.length === 10 ? `${d.slice(0, 2)} ${d.slice(2, 6)} ${d.slice(6)}` : e164;
+}
+
+/**
+ * Generic copy only: phones are shared, so never name the appointment type or
+ * the service. People without the app get the clinic's number instead.
+ */
+export function reminderText(
+  at: Date,
+  recipient: "self" | "carer",
+  opts: { now?: Date; clinicPhone?: string | null } = {},
+) {
+  const when = timePhrase(at, opts.now);
+  const details = opts.clinicPhone ? `Call ${localPhone(opts.clinicPhone)} for details.` : "Open MyMob for details.";
   return recipient === "self"
-    ? `You have an appointment ${when}. Open MyMob for details.`
-    : `Someone you care for has an appointment ${when}. Open MyMob for details.`;
+    ? `You have an appointment ${when}. ${details}`
+    : `Someone you care for has an appointment ${when}. ${details}`;
 }
 
 async function hasDevice(userId: string | null | undefined) {
@@ -167,7 +181,7 @@ export async function scheduleReminders(appointmentId: string) {
 export async function dispatchDueReminders(now = new Date()) {
   const due = await db.reminder.findMany({
     where: { deliveryStatus: "scheduled", scheduledFor: { lte: now } },
-    include: { appointment: { include: { patientLink: true } } },
+    include: { appointment: { include: { patientLink: { include: { provider: true } } } } },
     take: 200,
   });
   let sent = 0;
@@ -184,7 +198,11 @@ export async function dispatchDueReminders(now = new Date()) {
       await db.reminder.update({ where: { id: r.id }, data: { deliveryStatus: "skipped" } });
       continue;
     }
-    const text = reminderText(appt.startsAt, r.recipient, now);
+    const appOnly = r.recipient === "carer" || appt.patientLink.status === "accepted";
+    const text = reminderText(appt.startsAt, r.recipient, {
+      now,
+      clinicPhone: appOnly ? null : appt.patientLink.provider.phone,
+    });
     let channel = r.channel;
     let ok = false;
     if (channel === "push" && r.recipientUserId) {
@@ -208,10 +226,12 @@ export async function dispatchDueReminders(now = new Date()) {
 export async function notifyBooked(appointmentId: string) {
   const appt = await db.appointment.findUniqueOrThrow({
     where: { id: appointmentId },
-    include: { patientLink: { include: { user: true } } },
+    include: { patientLink: { include: { user: true, provider: true } } },
   });
   const link = appt.patientLink;
-  const text = `You have a new appointment ${timePhrase(appt.startsAt)}. Open MyMob for details.`;
+  const app = link.status === "accepted" && !!link.userId;
+  const details = app || !link.provider.phone ? "Open MyMob for details." : `Call ${localPhone(link.provider.phone)} for details.`;
+  const text = `You have a new appointment ${timePhrase(appt.startsAt)}. ${details}`;
   if (link.status === "accepted" && link.userId) {
     if (await sendPush(link.userId, text, { kind: "appointment", appointmentId })) return "push";
   }

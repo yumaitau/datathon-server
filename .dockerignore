@@ -1,0 +1,9 @@
+node_modules
+.next
+generated
+.env
+.env.*
+!.env.example
+public/maplibre-gl-worker.mjs
+*.tsbuildinfo
+.git

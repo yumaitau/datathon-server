@@ -53,6 +53,8 @@ export async function checkOtp(phone: string, code: string) {
 
 export const auth = betterAuth({
   database: prismaAdapter(db, { provider: "postgresql" }),
+  // Extra web origins (e.g. a LAN address for a phone on the same Wi-Fi).
+  trustedOrigins: (process.env.TRUSTED_ORIGINS ?? "").split(",").filter(Boolean),
   session: { expiresIn: 60 * 60 * 24 * 60, updateAge: 60 * 60 * 24 },
   user: {
     additionalFields: {

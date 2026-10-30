@@ -1,0 +1,66 @@
+# Local demo / test stack:  docker compose up --build
+#   web + API  http://localhost:3000
+#   Postgres   localhost:5433 (user/password/db: mymob)
+# AWS SNS and APNs are mocked unless their variables are set (see .env.example);
+# mocked SMS and push appear at http://localhost:3000/admin/outbox.
+name: mymob
+
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: mymob
+      POSTGRES_PASSWORD: mymob
+      POSTGRES_DB: mymob
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mymob"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  app:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://mymob:mymob@db:5432/mymob?schema=public
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-local-demo-secret-change-me-0123456789}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000}
+      TRUSTED_ORIGINS: ${TRUSTED_ORIGINS:-}
+      DEMO_OTP_CODE: ${DEMO_OTP_CODE:-123456}
+      CRON_SECRET: ${CRON_SECRET:-local-cron}
+      APP_TIMEZONE: ${APP_TIMEZONE:-Australia/Darwin}
+      SEED: ${SEED:-if-empty}
+      # Drop-in AWS / APNs: set these in a .env file next to this compose file.
+      SNS_ENABLED: ${SNS_ENABLED:-false}
+      AWS_REGION: ${AWS_REGION:-ap-southeast-2}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      SNS_SENDER_ID: ${SNS_SENDER_ID:-}
+      APNS_KEY_ID: ${APNS_KEY_ID:-}
+      APNS_TEAM_ID: ${APNS_TEAM_ID:-}
+      APNS_BUNDLE_ID: ${APNS_BUNDLE_ID:-}
+      APNS_PRIVATE_KEY: ${APNS_PRIVATE_KEY:-}
+      APNS_PRODUCTION: ${APNS_PRODUCTION:-false}
+
+  # Stand-in for the AWS scheduler: runs the reminder job every 5 minutes.
+  cron:
+    image: curlimages/curl:latest
+    depends_on:
+      app:
+        condition: service_healthy
+    environment:
+      CRON_SECRET: ${CRON_SECRET:-local-cron}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - 'while true; do curl -fsS -X POST -H "authorization: Bearer $$CRON_SECRET" http://app:3000/api/cron/reminders; echo; sleep 300; done'
+
+volumes:
+  pgdata:
