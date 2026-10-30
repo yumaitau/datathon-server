@@ -1,15 +1,18 @@
 import { getLocale, getTranslations } from "next-intl/server";
 import Link from "next/link";
 import { Suspense } from "react";
+import { LanguagePicker } from "@/components/language-picker";
 import { NavLink } from "@/components/nav-link";
+import { selectableLanguages } from "@/lib/i18n";
 import { requireWebActor } from "@/lib/web";
 import { signOutAction } from "../login/actions";
-import { toggleLocaleAction } from "../locale-actions";
 
 async function TopBar() {
   const actor = await requireWebActor();
   const t = await getTranslations("nav");
   const locale = await getLocale();
+  const languages = await selectableLanguages(actor);
+  const custodian = actor.elderGroupIds.size > 0 || actor.user.memberships.some((m) => m.canTranslate);
   return (
     <header className="border-b border-line bg-surface">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-2 px-6 py-3">
@@ -17,14 +20,21 @@ async function TopBar() {
         <nav aria-label={t("label")} className="flex flex-wrap gap-1">
           {actor.elderGroupIds.size > 0 && <NavLink href="/elder">{t("elder")}</NavLink>}
           {actor.providerIds.length > 0 && <NavLink href="/provider">{t("provider")}</NavLink>}
+          {custodian && <NavLink href="/languages">{t("languages")}</NavLink>}
           {actor.isAdmin && <NavLink href="/admin">{t("admin")}</NavLink>}
         </nav>
         <div className="ml-auto flex items-center gap-3 text-sm">
-          <form action={toggleLocaleAction}>
-            <button className="rounded-md px-2 py-1 text-ink-muted hover:bg-sunken" title={t("languageHint")}>
-              {locale === "en" ? t("demoLanguage") : "English"}
-            </button>
-          </form>
+          <LanguagePicker
+            current={locale}
+            label={t("language")}
+            languages={[
+              { code: "en", label: "English" },
+              ...languages.map((l) => ({
+                code: l.code,
+                label: `${l.endonym ?? l.name}${l.status === "draft" ? ` (${t("draft")})` : ""}`,
+              })),
+            ]}
+          />
           <span className="text-ink-muted">{actor.user.name}</span>
           <form action={signOutAction}>
             <button className="rounded-md px-2 py-1 text-ink-muted hover:bg-sunken">{t("signOut")}</button>

@@ -12,12 +12,12 @@
     "typecheck": "tsc --noEmit",
     "db:migrate": "prisma migrate deploy",
     "db:seed": "prisma db seed",
-    "i18n:pseudo": "node scripts/pseudo-locale.mjs",
     "smoke": "python3 scripts/smoke.py",
     "test": "vitest run"
   },
   "dependencies": {
     "@aws-sdk/client-sns": "^3.1159.0",
+    "@formatjs/icu-messageformat-parser": "^3.5.22",
     "@prisma/adapter-pg": "^7.10.1",
     "@prisma/client": "^7.10.1",
     "better-auth": "^1.7.14",

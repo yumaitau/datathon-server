@@ -3,6 +3,7 @@ import { ActionForm } from "@/components/action-form";
 import { SubmitButton } from "@/components/submit-button";
 import { Badge, Card, Field, Table, Td, buttonClass, inputClass } from "@/components/ui";
 import { db } from "@/lib/db";
+import { custodianAction } from "../../../languages/actions";
 import { membershipAction, nominateAction } from "../../actions";
 
 export default async function Members({ params }: PageProps<"/elder/[groupId]/members">) {
@@ -16,12 +17,24 @@ export default async function Members({ params }: PageProps<"/elder/[groupId]/me
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
       <Card title={t("membersCount", { count: members.length })} description={t("membersHint")}>
-        <Table head={[t("name"), t("role"), t("joined"), ""]}>
+        <Table head={[t("name"), t("role"), t("joined"), t("custodian"), ""]}>
           {members.map((m) => (
             <tr key={m.id}>
               <Td className="font-medium">{m.user.name}</Td>
               <Td>{m.role === "elder" ? <Badge tone="accent">{t("elderRole")}</Badge> : <span className="text-ink-muted">{t("memberRole")}</span>}</Td>
               <Td className="text-ink-muted">{m.createdAt.toLocaleDateString("en-AU")}</Td>
+              <Td>
+                {m.role === "elder" ? (
+                  <span className="text-xs text-ink-faint">{t("custodianElder")}</span>
+                ) : (
+                  <form action={custodianAction}>
+                    <input type="hidden" name="membershipId" value={m.id} />
+                    <SubmitButton size="sm" variant={m.canTranslate ? "secondary" : "ghost"} name="canTranslate" value={m.canTranslate ? "false" : "true"}>
+                      {m.canTranslate ? t("custodianRemove") : t("custodianAdd")}
+                    </SubmitButton>
+                  </form>
+                )}
+              </Td>
               <Td className="text-right">
                 {m.role !== "elder" && (
                   <form action={membershipAction}>

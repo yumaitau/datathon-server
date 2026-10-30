@@ -154,6 +154,27 @@ only text and minimal fields, in priority order:
 The response header `X-Payload-Bytes` reports the uncompressed size and
 `X-Compressed-Bytes` the gzip size, for the demo network log.
 
+## Community languages
+
+Communities translate MyMob into their own languages (see README). The app
+offers English plus every published language, and overlays the downloaded
+strings on its built-in English, so anything untranslated stays English.
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| GET | `/api/i18n` | `LanguageInfo[]`: English, all published languages, and drafts the caller helps write. No auth required |
+| GET | `/api/i18n/:code?platform=ios` | `{ code, name, endonym, status, platform, version, strings }`. `strings` maps each Xcode source key to its approved translation. Sends an `ETag`; repeat with `If-None-Match` to get `304` when unchanged |
+
+```
+LanguageInfo { code /* BCP 47, e.g. ISO 639-3 */, name, endonym?, status: "draft"|"published",
+               approved?: number, total?: number, updatedAt? }
+```
+
+Translations keep the source's printf placeholders by type (`%@`, `%lld`);
+positional forms like `%2$@` are allowed so word order can change. Use the
+language `code` as the app's locale for formatting; `Intl`/`Locale` fall back to
+English rules for codes they don't know.
+
 ## Other endpoints
 
 | Method | Path | Notes |

@@ -9,6 +9,7 @@
  */
 import "dotenv/config";
 import { randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../generated/prisma/client";
 import type { Gender } from "../generated/prisma/enums";
@@ -35,10 +36,27 @@ const FEMALE = ["Leah", "Grace", "Ruby", "Mia", "Tahlia", "Jasmine", "Kiara", "S
 const MALE = ["Sam", "Tom", "Jordan", "Ray", "Darcy", "Lachlan", "Tyson", "Jarrah", "Kane", "Brodie", "Reuben", "Mitchell", "Cody", "Jayden", "Isaac", "Nathan", "Wade", "Clinton", "Dale", "Errol", "Keith", "Lionel", "Mervyn", "Stanley", "Jesse", "Aaron", "Blake", "Corey", "Dylan", "Ethan"];
 const SURNAMES = ["Walker", "Baker", "Miller", "Thompson", "Cooper", "Hayes", "Bennett", "Fletcher", "Morgan", "Turner", "Wallace", "Harding", "Ross", "Ellis", "Carter", "Mason", "Webb", "Dawson", "Lane", "Price", "Foster", "Sutton", "Hughes", "Rowe", "Barton", "Nolan", "Pike", "Shaw", "Doyle", "Keane"];
 
+type MessageTree = { [key: string]: string | MessageTree };
+const flattenMessages = (tree: MessageTree, prefix = ""): [string, string][] =>
+  Object.entries(tree).flatMap(([k, v]) => (typeof v === "string" ? [[`${prefix}${k}`, v] as [string, string]] : flattenMessages(v, `${prefix}${k}.`)));
+
+/** Pseudo-translation: accented letters in brackets; ICU arguments and printf specifiers untouched. */
+function pseudo(text: string) {
+  const map: Record<string, string> = { a: "á", e: "é", i: "í", o: "ó", u: "ú", A: "Á", E: "É", I: "Í", O: "Ó", U: "Ú", c: "ç", n: "ñ" };
+  let depth = 0;
+  let out = "";
+  for (const ch of text) {
+    if (ch === "{") depth++;
+    out += depth === 0 ? (map[ch] ?? ch) : ch;
+    if (ch === "}") depth--;
+  }
+  return `⟦${out}⟧`;
+}
+
 async function reset() {
   // Children first; this script owns the whole demo database.
   const tables = [
-    "Activity", "ClientMutation", "AuditLog", "NotificationLog", "Reminder", "CarerLink", "Appointment",
+    "Translation", "Language", "Activity", "ClientMutation", "AuditLog", "NotificationLog", "Reminder", "CarerLink", "Appointment",
     "PatientLink", "ProviderGroupAccess", "ProviderStaff", "Report", "Reaction", "Comment", "Rsvp", "Event",
     "Post", "ElderNomination", "Membership", "Provider", "Group", "DeviceProfile", "OtpCode", "verification",
     "account", "session", "user",
@@ -383,6 +401,40 @@ async function main() {
   }
   for (let i = 0; i < appointments.length; i += 2000) await db.appointment.createMany({ data: appointments.slice(i, i + 2000) as never });
   for (let i = 0; i < reminders.length; i += 4000) await db.reminder.createMany({ data: reminders.slice(i, i + 4000) as never });
+
+  // ---------- Demo community language ----------
+  // Fictional: `qaa` is reserved for local use, so it can't be mistaken for a
+  // real language. Pseudo-text stands in for real translation work.
+  const language = await db.language.create({
+    data: {
+      code: "qaa",
+      name: "Plains demo language",
+      endonym: "Pláíñs démó",
+      communityId: salt.id,
+      status: "published",
+      notes: "Fictional demo language. Real languages are added by a community's Elders.",
+      createdById: grace.id,
+    },
+  });
+  await db.membership.update({ where: { userId_groupId: { userId: leah.id, groupId: salt.id } }, data: { canTranslate: true } });
+  const readJson = (file: string) => JSON.parse(readFileSync(new URL(`../messages/${file}`, import.meta.url), "utf8"));
+  const sources: [string, string][] = [
+    ...flattenMessages(readJson("en.json")),
+    ...Object.entries(readJson("app.en.json") as Record<string, string>).map(([k, v]): [string, string] => [`app:${k}`, v]),
+  ];
+  const translations = sources
+    .map(([key, english], i) => ({ key, english, slot: i % 12 }))
+    // Most strings approved, some drafts waiting for an Elder, a few missing (they show in English).
+    .filter((x) => x.slot !== 11)
+    .map((x) => ({
+      languageId: language.id,
+      key: x.key,
+      value: pseudo(x.english),
+      status: x.slot === 10 ? ("draft" as const) : ("approved" as const),
+      updatedById: x.slot === 10 ? leah.id : grace.id,
+      approvedById: x.slot === 10 ? null : grace.id,
+    }));
+  await db.translation.createMany({ data: translations });
 
   await db.auditLog.create({ data: { actorId: admin.id, action: "seed", entity: "Database", detail: "Demo data loaded" } });
 

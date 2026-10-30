@@ -49,7 +49,34 @@ pnpm dev
 | `pnpm test` | Unit tests (Vitest) |
 | `pnpm smoke [url]` | End-to-end check of both demo flows against a running, freshly seeded server |
 | `pnpm db:seed` | Wipe and reload demo data |
-| `pnpm i18n:pseudo` | Regenerate the placeholder demo language from `messages/en.json` |
+
+## Community languages
+
+Communities can translate MyMob (web portals and the iOS app) into their own
+languages, at `/languages`:
+
+- A language **belongs to a community**. Only that community's Elders can add
+  it, approve strings and publish it. Elders appoint **language custodians**
+  (Elder portal, Members) who draft translations; nothing a custodian writes is
+  shown to anyone else until an Elder approves it.
+- Codes are BCP 47: an ISO 639-3 code (AUSTLANG lists them), optionally with a
+  region. `qaa`–`qtz` are reserved for local use, e.g. a variety without a code.
+- The editor shows each English string beside its translation, filters by
+  missing, waiting and approved, and checks placeholders: `{name}` in web
+  strings and `%@` / `%lld` in app strings must survive translation.
+- **Export / import** a JSON file to work offline with a language centre;
+  imported strings arrive as drafts for Elder review.
+- Untranslated strings fall back to English everywhere, so a language can be
+  published while partly done.
+- Everyone picks a language from the menu (also on the sign-in page). The app
+  downloads approved strings from `GET /api/i18n/:code?platform=ios`.
+- After adding or changing text in the iOS app, run
+  `node scripts/sync-ios-strings.mjs` to refresh `messages/app.en.json`, so the
+  new strings appear in the editor.
+
+The seeded "Plains demo language" (`qaa`, owned by Saltbush Creek) is fictional
+pseudo-text: no real language names appear in demo data. Leah (0400 000 004)
+is a custodian, so you can try the draft → Elder approval flow.
 
 ## Demo accounts
 

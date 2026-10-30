@@ -160,6 +160,7 @@ model Group {
   events        Event[]
   providerAccess ProviderGroupAccess[]
   nominations   ElderNomination[]
+  languages     Language[]
 
   @@index([communityId])
 }
@@ -184,6 +185,8 @@ model Membership {
   status      MembershipStatus @default(pending)
   /// Under-18 joins require guardian consent before an Elder can approve.
   guardianConsentAt DateTime?
+  /// Language custodian: may draft translations of the community's languages.
+  canTranslate Boolean @default(false)
   decidedById String?
   decidedAt   DateTime?
   createdAt   DateTime         @default(now())
@@ -591,4 +594,54 @@ model Activity {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, communityId, day])
+}
+
+// ---------- Community languages ----------
+
+enum LanguageStatus {
+  draft
+  published
+}
+
+enum TranslationStatus {
+  draft
+  approved
+}
+
+/// A language a community translates MyMob into. The community owns it: only
+/// its Elders and the language custodians they appoint can edit or publish it.
+model Language {
+  id          String         @id @default(cuid())
+  /// BCP 47 tag, e.g. an ISO 639-3 code. `qaa`-`qtz` are reserved for local use.
+  code        String         @unique
+  name        String
+  /// The language's name for itself.
+  endonym     String?
+  communityId String
+  status      LanguageStatus @default(draft)
+  notes       String?
+  createdById String
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  community    Group         @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  translations Translation[]
+
+  @@index([communityId])
+}
+
+model Translation {
+  id           String            @id @default(cuid())
+  languageId   String
+  /// Dotted message key, e.g. "elder.approve".
+  key          String
+  value        String
+  status       TranslationStatus @default(draft)
+  updatedById  String
+  approvedById String?
+  updatedAt    DateTime          @updatedAt
+
+  language Language @relation(fields: [languageId], references: [id], onDelete: Cascade)
+
+  @@unique([languageId, key])
 }
