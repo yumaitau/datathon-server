@@ -80,14 +80,14 @@ expect_status("GET", f"/api/groups/{salt}/moderation", 403, token=jordan)
 
 post_cmid = cmid()
 post = call("POST", f"/api/groups/{salt}/posts", {"title": "Footy fundraiser", "body": "Sausage sizzle Saturday", "clientMutationId": post_cmid}, jordan)
-check(post["status"] == "pending", "Member post waits for Elder approval")
+check(post["status"] == "published", "Member post publishes without Elder approval")
 again = call("POST", f"/api/groups/{salt}/posts", {"title": "Footy fundraiser", "body": "Sausage sizzle Saturday", "clientMutationId": post_cmid}, jordan)
 check(again["id"] == post["id"], "Re-submitting the same clientMutationId does not duplicate")
 leah_feed = call("GET", f"/api/groups/{salt}/feed", token=leah)
-check(all(p["id"] != post["id"] for p in leah_feed["posts"]), "Pending post hidden from other members")
+check(any(p["id"] == post["id"] for p in leah_feed["posts"]), "Other members see the new post straight away")
 
-approved = call("POST", f"/api/posts/{post['id']}/approve", {"pinned": True}, grace)
-check(approved["status"] == "published" and approved["pinned"], "Elder approves and pins")
+pinned = call("POST", f"/api/posts/{post['id']}/pin", {"pinned": True}, grace)
+check(pinned["pinned"], "Elder pins the post")
 feed = call("GET", f"/api/groups/{salt}/feed", token=leah)
 check(feed["posts"][0]["pinned"], "Pinned posts lead the feed")
 
@@ -122,12 +122,12 @@ members = call("GET", f"/api/groups/{salt}/members", token=grace)
 check(next(m for m in members if m["id"] == jm["id"])["canTranslate"], "Elder appoints a language custodian")
 call("POST", f"/api/memberships/{jm['id']}/custodian", {"canTranslate": False}, grace)
 
-# A rejected post reaches its author's offline cache as a removal, not a post.
+# A post an Elder removes reaches its author's offline cache as a removal, not a post.
 before = call("POST", "/api/sync", {"mutations": []}, jordan)["cursor"]
 junk = call("POST", f"/api/groups/{salt}/posts", {"body": "Selling raffle tickets", "clientMutationId": cmid()}, jordan)
 call("POST", f"/api/posts/{junk['id']}/reject", {}, grace)
 delta = call("POST", "/api/sync", {"cursor": before, "mutations": []}, jordan)
-check(junk["id"] in delta["removedPostIds"] and all(p["id"] != junk["id"] for p in delta["posts"]), "Rejected post sent as a removal")
+check(junk["id"] in delta["removedPostIds"] and all(p["id"] != junk["id"] for p in delta["posts"]), "Removed post sent as a removal")
 lite = call("POST", "/api/sync/lite", {"cursor": before, "mutations": []}, jordan)
 check(junk["id"] in lite["removedPostIds"], "Lite sync carries removals too")
 

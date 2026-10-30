@@ -45,10 +45,8 @@ export async function createPost(actor: Actor, input: z.infer<typeof createPostI
       deceasedWarning: elder ? !!input.deceasedWarning : false,
       // Sorry business defaults to comments off; Elders can allow condolences.
       commentsEnabled: !sorry,
-      // Elders' own posts publish directly; everyone else's wait for approval.
-      status: elder ? "published" : "pending",
-      decidedById: elder ? actor.user.id : null,
-      decidedAt: elder ? new Date() : null,
+      // Everyone's posts publish straight away; Elders moderate afterwards (remove, pin, lock).
+      status: "published",
       clientMutationId,
     },
   });

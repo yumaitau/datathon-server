@@ -274,10 +274,10 @@ async function main() {
       status: "published", commentsEnabled: false, deceasedWarning: true, decidedById: elder.id, decidedAt: daysAgo(5), createdAt: daysAgo(5), updatedAt: daysAgo(5),
     });
   }
-  // A pinned welcome post and one pending member post in each community.
+  // A pinned welcome post and a member post in each community.
   posts.push(
-    { id: id(), communityId: salt.id, groupId: salt.id, authorId: grace.id, kind: "announcement", title: "Welcome to the Saltbush Creek hub", body: "This space is looked after by Elders. Posts are checked before they go up. Be kind and look after each other.", status: "published", pinned: true, decidedById: grace.id, decidedAt: daysAgo(180), createdAt: daysAgo(180), updatedAt: daysAgo(180) },
-    { id: id(), communityId: salt.id, groupId: salt.id, authorId: saltMembers[9].id, kind: "general", title: "Selling a trailer", body: "Box trailer, good tyres. Message me if keen.", status: "pending", createdAt: daysAgo(1), updatedAt: daysAgo(1) },
+    { id: id(), communityId: salt.id, groupId: salt.id, authorId: grace.id, kind: "announcement", title: "Welcome to the Saltbush Creek hub", body: "This space is looked after by Elders. Be kind and look after each other.", status: "published", pinned: true, decidedById: grace.id, decidedAt: daysAgo(180), createdAt: daysAgo(180), updatedAt: daysAgo(180) },
+    { id: id(), communityId: salt.id, groupId: salt.id, authorId: saltMembers[9].id, kind: "general", title: "Selling a trailer", body: "Box trailer, good tyres. Message me if keen.", status: "published", createdAt: daysAgo(1), updatedAt: daysAgo(1) },
     { id: id(), communityId: iron.id, groupId: iron.id, authorId: tom.id, kind: "announcement", title: "Welcome to the Ironbark Ridge hub", body: "Elders look after this space. Share news, events and help each other out.", status: "published", pinned: true, decidedById: tom.id, decidedAt: daysAgo(180), createdAt: daysAgo(180), updatedAt: daysAgo(180) },
     { id: id(), communityId: iron.id, groupId: subgroups[2].id, authorId: tom.id, kind: "announcement", title: "Women's health morning", body: "Women only. Health yarn and morning tea at the clinic Thursday.", status: "published", restrictGender: "female", decidedById: tom.id, decidedAt: daysAgo(5), createdAt: daysAgo(5), updatedAt: daysAgo(5) },
   );

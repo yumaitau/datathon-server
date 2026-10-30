@@ -40,8 +40,8 @@ Membership { id, groupId, groupName, groupType, communityId, role: "member"|"eld
 | POST | `/api/memberships/:id/remove` | Elder only |
 | POST | `/api/memberships/:id/custodian` | Elder only. `{ canTranslate }`: appoint or stand down a language custodian |
 | POST | `/api/memberships/:id/guardian-consent` | The young person's guardian only. Required before an Elder can approve an under-18 join (approve returns 409 until then) |
-| POST | `/api/posts/:id/approve` | Elder only. Optional `{ pinned }` |
-| POST | `/api/posts/:id/reject` | Elder only |
+| POST | `/api/posts/:id/approve` | Elder only. Optional `{ pinned }`. Legacy: posts no longer start `pending` |
+| POST | `/api/posts/:id/reject` | Elder only. Removes a post; members' caches drop it via `removedPostIds` |
 | POST | `/api/posts/:id/pin` | Elder only. `{ pinned: boolean }` |
 | POST | `/api/posts/:id/settings` | Elder only. `{ commentsEnabled?, threadLocked?, deceasedWarning? }` |
 | POST | `/api/provider-access/:id/decide` | Elder only. `{ decision: "approved"\|"rejected" }` |
@@ -64,8 +64,8 @@ ProviderRequest { id, provider: { id, name, type, address }, message?, status, c
 Report          { id, reason, comment: Comment, createdAt }
 ```
 
-Posts by Elders publish immediately; everyone else's start `pending` and enter
-the Elder queue. Posts the viewer may not see (gender/age restriction) are never
+Every member's post publishes immediately. Elders moderate afterwards: remove
+(`reject`), pin, turn comments off or lock the thread. Posts the viewer may not see (gender/age restriction) are never
 returned. Deceased-warning posts set `deceasedWarning: true`; the client hides
 media until the viewer taps through.
 

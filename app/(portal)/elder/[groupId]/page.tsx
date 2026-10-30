@@ -12,7 +12,7 @@ export default async function ElderQueue({ params }: PageProps<"/elder/[groupId]
   const t = await getTranslations("elder");
   const [members, posts, providers, reports, pinned] = await Promise.all([
     db.membership.findMany({ where: { groupId, status: "pending" }, include: { user: true }, orderBy: { createdAt: "asc" } }),
-    db.post.findMany({ where: { groupId, status: "pending" }, include: { author: true }, orderBy: { createdAt: "asc" } }),
+    db.post.findMany({ where: { groupId, status: "published" }, include: { author: true }, orderBy: { createdAt: "desc" }, take: 10 }),
     db.providerGroupAccess.findMany({ where: { groupId, status: "requested" }, include: { provider: true } }),
     db.report.findMany({
       where: { status: "open", comment: { OR: [{ post: { groupId } }, { event: { groupId } }] } },
@@ -71,28 +71,26 @@ export default async function ElderQueue({ params }: PageProps<"/elder/[groupId]
         )}
       </Card>
 
-      <Card title={t("postsWaiting")} description={t("postsWaitingHint")} className="lg:col-span-2">
-        {posts.length === 0 ? <EmptyState>{t("noneWaiting")}</EmptyState> : (
+      <Card title={t("recentPosts")} description={t("recentPostsHint")} className="lg:col-span-2">
+        {posts.length === 0 ? <EmptyState>{t("noPosts")}</EmptyState> : (
           <ul className="flex flex-col divide-y divide-line">
             {posts.map((p) => (
-              <li key={p.id} className="flex flex-col gap-3 py-4">
-                <div className="flex flex-col gap-1">
+              <li key={p.id} className="flex flex-wrap items-start justify-between gap-3 py-4">
+                <div className="flex min-w-0 flex-1 flex-col gap-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-medium">{p.title ?? t("untitled")}</span>
                     <Badge>{p.kind.replace("_", " ")}</Badge>
+                    {p.pinned && <Badge tone="info">{t("pinned")}</Badge>}
                     {p.restrictGender && <Badge tone="info">{t("restrictedGender", { gender: p.restrictGender })}</Badge>}
                     {p.minAge != null && <Badge tone="info">{t("restrictedAge", { age: p.minAge })}</Badge>}
                   </div>
                   <p className="max-w-prose text-sm">{p.body}</p>
                   <span className="text-xs text-ink-muted">{p.author.name} · {when(p.createdAt)}</span>
                 </div>
-                <form action={postAction} className="flex flex-wrap items-center gap-3">
+                <form action={postAction} className="flex gap-2">
                   <input type="hidden" name="id" value={p.id} />
-                  <label className="flex items-center gap-2 text-sm">
-                    <input type="checkbox" name="pin" className="size-4 accent-accent" /> {t("pinToTop")}
-                  </label>
-                  <SubmitButton size="sm" variant="secondary" name="action" value="reject">{t("decline")}</SubmitButton>
-                  <SubmitButton size="sm" name="action" value="approve">{t("publish")}</SubmitButton>
+                  <SubmitButton size="sm" variant="secondary" name="action" value={p.pinned ? "unpin" : "pin"}>{p.pinned ? t("unpin") : t("pinToTop")}</SubmitButton>
+                  <SubmitButton size="sm" variant="danger" name="action" value="reject">{t("removePost")}</SubmitButton>
                 </form>
               </li>
             ))}

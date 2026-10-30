@@ -4,7 +4,7 @@ Elder-governed community hub for Aboriginal and Torres Strait Islander
 communities (datathon prototype). One Next.js app serves:
 
 - the REST API for the iOS app (`/api/*`, contract in [docs/API.md](docs/API.md))
-- the **Elder portal** (`/elder`): join requests, post approval and pinning,
+- the **Elder portal** (`/elder`): join requests, removing and pinning posts,
   clinic access requests, reported comments, members, Elder nominations, data
   export, engagement dashboard and service gap map
 - the **clinic portal** (`/provider`): invite patients by mobile, book and manage
@@ -119,8 +119,8 @@ minutes (EventBridge).
 ## Demo flows
 
 **A. Elder runs the community.** Jordan requests to join (iOS) → Aunty Grace
-approves (iOS or `/elder`) → Jordan posts an announcement → Grace approves and
-pins it → Grace allows Mulga Springs Dental's pending request → Grace opens
+approves (iOS or `/elder`) → Jordan posts an announcement (live straight away) →
+Grace pins it → Grace allows Mulga Springs Dental's pending request → Grace opens
 `/elder/…/engagement`.
 
 **B. Clinic to patient.** Priya invites a patient and books a 715 health check at
