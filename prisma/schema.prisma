@@ -1,0 +1,594 @@
+// MyMob data model. Every community-owned row carries `communityId` so the
+// scoped client in lib/db.ts can enforce data sovereignty boundaries.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------- Auth (Better Auth core + phone-number plugin) ----------
+
+model User {
+  id                  String    @id
+  name                String
+  email               String    @unique
+  emailVerified       Boolean   @default(false)
+  image               String?
+  phoneNumber         String?   @unique
+  phoneNumberVerified Boolean?
+  dateOfBirth         DateTime?
+  gender              Gender?
+  guardianId          String?
+  platformRole        PlatformRole @default(none)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  guardian        User?            @relation("Guardian", fields: [guardianId], references: [id])
+  wards           User[]           @relation("Guardian")
+  sessions        Session[]
+  accounts        Account[]
+  devices         DeviceProfile[]
+  memberships     Membership[]
+  posts           Post[]
+  rsvps           Rsvp[]
+  comments        Comment[]
+  staffOf         ProviderStaff[]
+  patientLinks    PatientLink[]
+  carerOf         CarerLink[]      @relation("CarerLinkCarer")
+  carers          CarerLink[]      @relation("CarerLinkPerson")
+  nominations     ElderNomination[] @relation("Nominee")
+  activities      Activity[]
+
+  @@map("user")
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
+}
+
+/// OTP codes we issue ourselves (hashed) so SMS delivery is pluggable.
+model OtpCode {
+  id          String   @id @default(cuid())
+  phoneNumber String
+  codeHash    String
+  expiresAt   DateTime
+  attempts    Int      @default(0)
+  consumedAt  DateTime?
+  createdAt   DateTime @default(now())
+
+  @@index([phoneNumber, createdAt])
+}
+
+enum Gender {
+  female
+  male
+  other
+}
+
+enum PlatformRole {
+  none
+  admin
+}
+
+// ---------- Devices ----------
+
+model DeviceProfile {
+  id        String   @id @default(cuid())
+  userId    String
+  deviceId  String
+  apnsToken String?
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, deviceId])
+}
+
+// ---------- Groups and governance ----------
+
+enum GroupType {
+  nation
+  community
+  subgroup
+}
+
+model Group {
+  id          String    @id @default(cuid())
+  type        GroupType
+  parentId    String?
+  /// Owning community. Equals `id` for a community, the parent community for a
+  /// subgroup, and null for a nation (which owns no member data).
+  communityId String?
+  name        String
+  description String?
+  joinCode    String    @unique
+  lat         Float?
+  lng         Float?
+  createdAt   DateTime  @default(now())
+
+  parent        Group?               @relation("GroupTree", fields: [parentId], references: [id])
+  children      Group[]              @relation("GroupTree")
+  memberships   Membership[]
+  posts         Post[]
+  events        Event[]
+  providerAccess ProviderGroupAccess[]
+  nominations   ElderNomination[]
+
+  @@index([communityId])
+}
+
+enum MembershipRole {
+  member
+  elder
+}
+
+enum MembershipStatus {
+  pending
+  active
+  removed
+}
+
+model Membership {
+  id          String           @id @default(cuid())
+  communityId String?
+  userId      String
+  groupId     String
+  role        MembershipRole   @default(member)
+  status      MembershipStatus @default(pending)
+  /// Under-18 joins require guardian consent before an Elder can approve.
+  guardianConsentAt DateTime?
+  decidedById String?
+  decidedAt   DateTime?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, groupId])
+  @@index([communityId, status])
+}
+
+enum NominationStatus {
+  pending
+  verified
+  rejected
+}
+
+model ElderNomination {
+  id          String           @id @default(cuid())
+  communityId String?
+  groupId     String
+  nomineeId   String
+  nominatedBy String
+  status      NominationStatus @default(pending)
+  verifiedBy  String?
+  createdAt   DateTime         @default(now())
+  decidedAt   DateTime?
+
+  group   Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  nominee User  @relation("Nominee", fields: [nomineeId], references: [id], onDelete: Cascade)
+}
+
+// ---------- Posts, events, conversation ----------
+
+enum PostKind {
+  announcement
+  general
+  sorry_business
+}
+
+enum PostStatus {
+  pending
+  published
+  rejected
+}
+
+model Post {
+  id               String     @id @default(cuid())
+  communityId      String?
+  groupId          String
+  authorId         String
+  kind             PostKind   @default(announcement)
+  title            String?
+  body             String
+  imageUrl         String?
+  status           PostStatus @default(pending)
+  pinned           Boolean    @default(false)
+  urgent           Boolean    @default(false)
+  restrictGender   Gender?
+  minAge           Int?
+  deceasedWarning  Boolean    @default(false)
+  commentsEnabled  Boolean    @default(true)
+  threadLocked     Boolean    @default(false)
+  clientMutationId String?    @unique
+  decidedById      String?
+  decidedAt        DateTime?
+  archivedAt       DateTime?
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  group    Group     @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  author   User      @relation(fields: [authorId], references: [id])
+  comments Comment[]
+
+  @@index([communityId, status, updatedAt])
+}
+
+model Event {
+  id                String   @id @default(cuid())
+  communityId       String?
+  groupId           String
+  title             String
+  description       String?
+  category          String   @default("community")
+  startsAt          DateTime
+  endsAt            DateTime?
+  location          String
+  createdById       String
+  /// Set when a provider (clinic, service) posted the event.
+  providerId        String?
+  commentsEnabled   Boolean  @default(true)
+  threadLocked      Boolean  @default(false)
+  cancelledAt       DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  group    Group     @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  provider Provider? @relation(fields: [providerId], references: [id])
+  rsvps    Rsvp[]
+  comments Comment[]
+
+  @@index([communityId, updatedAt])
+}
+
+enum RsvpResponse {
+  going
+  maybe
+  no
+}
+
+model Rsvp {
+  id               String       @id @default(cuid())
+  communityId      String?
+  eventId          String
+  userId           String
+  response         RsvpResponse
+  clientMutationId String?
+  /// Client-side timestamp, used for last-write-wins on offline RSVPs.
+  respondedAt      DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
+}
+
+enum CommentStatus {
+  published
+  hidden
+  removed
+}
+
+model Comment {
+  id               String        @id @default(cuid())
+  communityId      String?
+  postId           String?
+  eventId          String?
+  authorId         String
+  parentCommentId  String?
+  body             String
+  status           CommentStatus @default(published)
+  clientMutationId String?       @unique
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  post    Post?     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  event   Event?    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  author  User      @relation(fields: [authorId], references: [id])
+  parent  Comment?  @relation("Thread", fields: [parentCommentId], references: [id])
+  replies Comment[] @relation("Thread")
+  reports Report[]
+
+  @@index([postId])
+  @@index([eventId])
+}
+
+enum ReactionTarget {
+  post
+  comment
+  event
+}
+
+enum ReactionKind {
+  like
+  heart
+  thinking_of_you
+}
+
+model Reaction {
+  id          String         @id @default(cuid())
+  communityId String?
+  targetType  ReactionTarget
+  targetId    String
+  userId      String
+  kind        ReactionKind
+  createdAt   DateTime       @default(now())
+
+  @@unique([targetType, targetId, userId, kind])
+  @@index([targetType, targetId])
+}
+
+enum ReportStatus {
+  open
+  actioned
+  dismissed
+}
+
+model Report {
+  id          String       @id @default(cuid())
+  communityId String?
+  commentId   String
+  reporterId  String
+  reason      String
+  status      ReportStatus @default(open)
+  createdAt   DateTime     @default(now())
+
+  comment Comment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+}
+
+// ---------- Providers and health ----------
+
+model Provider {
+  id        String   @id @default(cuid())
+  name      String
+  type      String
+  address   String
+  phone     String?
+  lat       Float
+  lng       Float
+  verified  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  staff        ProviderStaff[]
+  groupAccess  ProviderGroupAccess[]
+  patientLinks PatientLink[]
+  events       Event[]
+}
+
+model ProviderStaff {
+  id         String   @id @default(cuid())
+  providerId String
+  userId     String
+  provider   Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, userId])
+}
+
+enum AccessStatus {
+  requested
+  approved
+  rejected
+}
+
+model ProviderGroupAccess {
+  id          String       @id @default(cuid())
+  communityId String?
+  providerId  String
+  groupId     String
+  status      AccessStatus @default(requested)
+  message     String?
+  decidedById String?
+  decidedAt   DateTime?
+  createdAt   DateTime     @default(now())
+
+  provider Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  group    Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, groupId])
+}
+
+enum PatientLinkStatus {
+  invited
+  accepted
+  revoked
+}
+
+model PatientLink {
+  id           String            @id @default(cuid())
+  providerId   String
+  /// Null until the invitee signs in with the invited phone number.
+  userId       String?
+  invitedPhone String
+  displayName  String
+  status       PatientLinkStatus @default(invited)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  provider     Provider      @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  user         User?         @relation(fields: [userId], references: [id])
+  appointments Appointment[]
+
+  @@unique([providerId, invitedPhone])
+}
+
+enum AppointmentStatus {
+  booked
+  confirmed
+  attended
+  missed
+  cancelled
+}
+
+model Appointment {
+  id            String            @id @default(cuid())
+  /// Patient's home community, used only for de-identified aggregates.
+  communityId   String?
+  patientLinkId String
+  startsAt      DateTime
+  location      String
+  type          String
+  prepNotes     String?
+  transportNote String?
+  status        AppointmentStatus @default(booked)
+  confirmedAt   DateTime?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  patientLink PatientLink @relation(fields: [patientLinkId], references: [id], onDelete: Cascade)
+  reminders   Reminder[]
+
+  @@index([updatedAt])
+  @@index([communityId, startsAt])
+}
+
+enum CarerStatus {
+  active
+  revoked
+}
+
+model CarerLink {
+  id          String      @id @default(cuid())
+  userId      String
+  carerId     String
+  status      CarerStatus @default(active)
+  consentedAt DateTime    @default(now())
+  revokedAt   DateTime?
+  updatedAt   DateTime    @updatedAt
+
+  person User @relation("CarerLinkPerson", fields: [userId], references: [id], onDelete: Cascade)
+  carer  User @relation("CarerLinkCarer", fields: [carerId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, carerId])
+}
+
+enum ReminderChannel {
+  push
+  sms
+}
+
+enum ReminderRecipient {
+  self
+  carer
+}
+
+enum DeliveryStatus {
+  scheduled
+  sent
+  delivered
+  failed
+  skipped
+}
+
+model Reminder {
+  id             String            @id @default(cuid())
+  appointmentId  String
+  channel        ReminderChannel
+  recipient      ReminderRecipient
+  recipientUserId String?
+  recipientPhone String?
+  scheduledFor   DateTime
+  sentAt         DateTime?
+  deliveryStatus DeliveryStatus    @default(scheduled)
+
+  appointment Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+
+  @@index([deliveryStatus, scheduledFor])
+}
+
+// ---------- Platform ----------
+
+/// Every outgoing push and SMS. Doubles as the visible demo outbox when SNS or
+/// APNs credentials are absent.
+model NotificationLog {
+  id        String   @id @default(cuid())
+  channel   ReminderChannel
+  to        String
+  body      String
+  provider  String
+  status    String
+  error     String?
+  createdAt DateTime @default(now())
+}
+
+model AuditLog {
+  id       String   @id @default(cuid())
+  actorId  String?
+  action   String
+  entity   String
+  entityId String?
+  detail   String?
+  at       DateTime @default(now())
+
+  @@index([entity, at])
+}
+
+/// Idempotency ledger for queued offline writes.
+model ClientMutation {
+  id         String   @id
+  userId     String
+  type       String
+  result     Json
+  createdAt  DateTime @default(now())
+}
+
+/// One row per member per day they opened the app; feeds weekly-active metrics.
+model Activity {
+  id          String   @id @default(cuid())
+  userId      String
+  communityId String
+  day         DateTime @db.Date
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, communityId, day])
+}
