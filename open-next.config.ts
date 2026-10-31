@@ -1,3 +1,10 @@
-import { defineCloudflareConfig } from "@opennextjs/cloudflare";
+import { defineCloudflareConfig, type OpenNextConfig } from "@opennextjs/cloudflare";
 
-export default defineCloudflareConfig({});
+const config: OpenNextConfig = {
+  ...defineCloudflareConfig({}),
+  // Keeps the repository's default `build` command available for Cloudflare
+  // Workers Builds without recursively invoking OpenNext.
+  buildCommand: "pnpm build:next",
+};
+
+export default config;

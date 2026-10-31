@@ -11,7 +11,8 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
 COPY . .
 # prisma generate needs a syntactically valid URL; nothing connects at build time.
-RUN DATABASE_URL=postgresql://build:build@localhost:5432/build pnpm prisma generate && pnpm build
+ENV DATABASE_URL=postgresql://build:build@localhost:5432/build
+RUN pnpm prisma generate && pnpm build:node
 
 FROM base AS runtime
 ENV NODE_ENV=production PORT=3000 HOSTNAME=0.0.0.0

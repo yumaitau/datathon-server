@@ -12,11 +12,16 @@ communities (datathon prototype). One Next.js app serves:
 - the **platform admin** (`/admin`): verify Elder nominations, onboard and verify
   providers, SMS/push outbox, audit log
 
-Stack: Next.js 16 (App Router, Cache Components), Prisma 7 + Postgres, Better
-Auth (phone OTP + bearer tokens), Recharts, MapLibre with OpenStreetMap tiles,
-next-intl.
+Stack: Next.js 16 (App Router, Cache Components), Prisma 7 with PostgreSQL
+locally and Cloudflare D1 in production, Better Auth (phone OTP + bearer
+tokens), Recharts, MapLibre with OpenStreetMap tiles, next-intl.
 
-## Run it with Docker (demo and testing)
+## Local Docker demo and testing
+
+Docker is for local development, demos and testing only. It runs a local
+PostgreSQL database and never connects to or migrates the production D1
+database. Production is deployed as a Cloudflare Worker using the commands in
+the next section.
 
 ```bash
 docker compose up --build
@@ -44,7 +49,8 @@ pnpm dev
 
 | Command | What it does |
 | --- | --- |
-| `pnpm dev` / `pnpm build` | Next.js dev server / production build |
+| `pnpm dev` / `pnpm build:node` | Local Next.js development / Node production build |
+| `pnpm build` | Cloudflare/OpenNext production build |
 | `pnpm typecheck` · `pnpm lint` | TypeScript and ESLint |
 | `pnpm test` | Unit tests (Vitest) |
 | `pnpm smoke [url]` | End-to-end check of both demo flows against a running, freshly seeded server |
@@ -59,9 +65,15 @@ unchanged.
 
 ```bash
 pnpm db:d1:migrate       # apply pending migrations to production D1
+pnpm build               # build .open-next for Cloudflare Workers
 pnpm cf:preview          # build and run locally with workerd
 pnpm cf:deploy           # build and deploy mymob-server
 ```
+
+Cloudflare Workers Builds uses these repository-root commands:
+
+- Build command: `pnpm build`
+- Deploy command: `pnpm exec wrangler deploy`
 
 `BETTER_AUTH_SECRET` and `CRON_SECRET` are Worker secrets. Non-secret runtime
 configuration, the custom domain, and the D1 binding live in `wrangler.jsonc`.
