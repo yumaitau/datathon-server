@@ -88,6 +88,40 @@ Comment { id, author: { id, name }, body, parentCommentId?, status,
 
 Replies are one level deep: replying to a reply attaches to its top-level parent.
 
+## AI Aunty
+
+A private one-to-one yarn with a chatbot, switched on per group by that group's
+Elders. Every endpoint is scoped to the caller: there is no route that returns
+another member's thread, to Elders or anyone else.
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| GET | `/api/groups/:id/aunty` | The caller's own thread → `AuntyThread` |
+| POST | `/api/groups/:id/aunty` | `{ body, clientMutationId? }` → `{ messages: AuntyMessage[] }` (the pair just exchanged) |
+| DELETE | `/api/groups/:id/aunty` | Deletes the caller's thread |
+| PUT | `/api/groups/:id/aunty/settings` | Elder only. `{ enabled, guidance? }` → `{ enabled, guidance }` |
+
+```
+AuntyThread  { enabled, guidance?, messages: AuntyMessage[] }
+AuntyMessage { id, author: "member"|"aunty", body,
+               handoff?: "health"|"sorry_business"|"crisis"|"elder",
+               mocked, createdAt }
+```
+
+`403` with "The Elders haven't switched on an Aunty for this group" means the
+group has no Aunty yet; the app shows an empty state rather than an error.
+
+`handoff` is set when she stepped back instead of answering, and the app shows a
+"go and see a real person" panel. `crisis` is decided on the server from the
+member's own words before any model call, so it does not depend on the model
+behaving; it always returns the 13YARN and Lifeline numbers.
+
+`mocked: true` means no `BEDROCK_MODEL_ID` was configured and the reply came
+from the built-in canned lines, so demos work without AWS credentials.
+
+Repeating a `clientMutationId` returns the original exchange instead of asking
+again, so a replayed offline send never produces two different replies.
+
 ## Events
 
 | Method | Path | Notes |

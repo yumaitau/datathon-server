@@ -1,6 +1,7 @@
 import { createSign } from "node:crypto";
 import http2 from "node:http2";
 import { PublishCommand, SNSClient } from "@aws-sdk/client-sns";
+import { awsClientConfig } from "@/lib/aws";
 import { db } from "@/lib/db";
 
 // Real delivery is used when credentials are configured; otherwise messages are
@@ -13,7 +14,7 @@ let sns: SNSClient | undefined;
 export async function sendSms(to: string, body: string): Promise<SendResult> {
   let result: SendResult;
   if (process.env.SNS_ENABLED === "true") {
-    sns ??= new SNSClient({ region: process.env.AWS_REGION ?? "ap-southeast-2" });
+    sns ??= new SNSClient(awsClientConfig());
     try {
       await sns.send(
         new PublishCommand({

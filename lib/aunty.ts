@@ -1,4 +1,6 @@
+import { BedrockRuntimeClient, ConverseCommand } from "@aws-sdk/client-bedrock-runtime";
 import { forbidden, type Actor } from "@/lib/api";
+import { awsClientConfig } from "@/lib/aws";
 import { db } from "@/lib/db";
 
 /**
@@ -15,15 +17,21 @@ import { db } from "@/lib/db";
  * 2. **The Aunty steps back from anything that needs a real person.** Health,
  *    sorry business and crisis talk hand over instead of being answered.
  *
- * SHORTCUT: inference runs on Cloudflare Workers AI, which puts a processor
- * outside the PRD's "no offshore processors in the request path" commitment
- * (docs/PRD.md, Data sovereignty). Fine for a datathon prototype on seeded
- * demo data; before any real community's words go through it, move to an
- * inference path inside ap-southeast-2 or get explicit community consent for
- * the processor.
+ * Inference runs on Amazon Bedrock in ap-southeast-2, called from the Worker
+ * (or the Docker image locally) with credentials from lib/aws.ts. Point
+ * `BEDROCK_MODEL_ID` at a Sydney inference profile, not a global one, or the
+ * model call itself can be served outside Australia.
  */
 
-const WORKERS_AI_MODEL = process.env.WORKERS_AI_MODEL ?? "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
+/**
+ * No default. Newer Bedrock models are only reachable through a cross-region
+ * inference profile (the base model ID returns 400), and the right profile
+ * depends on the account's enabled models — so guessing one here would fail at
+ * runtime in a way that looks like a bug. Unset means "no model", which falls
+ * back to the canned replies below, exactly as unset SNS credentials fall back
+ * to the outbox in lib/notify.ts.
+ */
+const BEDROCK_MODEL_ID = process.env.BEDROCK_MODEL_ID;
 
 /** How much of the yarn is replayed to the model. Keeps us inside the context window. */
 const HISTORY_LIMIT = 20;
@@ -36,7 +44,8 @@ export type AuntyReply = {
   mocked: boolean;
 };
 
-type ChatMessage = { role: "system" | "user" | "assistant"; content: string };
+/** One turn of the yarn, in Bedrock Converse's shape. */
+type ChatTurn = { role: "user" | "assistant"; text: string };
 
 // ---------- Persona and guardrails ----------
 
@@ -117,7 +126,7 @@ export function splitHandoff(raw: string): { body: string; handoff: HandoffKind 
 // ---------- Inference ----------
 
 /**
- * Canned replies for when Workers AI is not configured, so the demo still runs
+ * Canned replies for when no Bedrock model is configured, so the demo still runs
  * on a plane. Mirrors lib/notify.ts, where unset credentials fall back to the
  * outbox rather than failing.
  */
@@ -148,35 +157,29 @@ function guessTopic(text: string): { handoff: HandoffKind | null } {
   return { handoff: null };
 }
 
-async function runWorkersAI(messages: ChatMessage[]): Promise<string> {
-  const account = process.env.CLOUDFLARE_ACCOUNT_ID;
-  const token = process.env.CLOUDFLARE_API_TOKEN;
-  if (!account || !token) throw new Error("not configured");
+let bedrock: BedrockRuntimeClient | undefined;
 
-  const res = await fetch(
-    `https://api.cloudflare.com/client/v4/accounts/${account}/ai/v1/chat/completions`,
-    {
-      method: "POST",
-      headers: {
-        authorization: `Bearer ${token}`,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        model: WORKERS_AI_MODEL,
-        messages,
-        temperature: 0.6,
-        max_tokens: 300,
-      }),
-      signal: AbortSignal.timeout(20_000),
-    },
+async function runBedrock(system: string, turns: ChatTurn[]): Promise<string> {
+  if (!BEDROCK_MODEL_ID) throw new Error("not configured");
+  bedrock ??= new BedrockRuntimeClient(awsClientConfig());
+
+  const res = await bedrock.send(
+    new ConverseCommand({
+      modelId: BEDROCK_MODEL_ID,
+      system: [{ text: system }],
+      messages: turns.map((t) => ({
+        role: t.role,
+        content: [{ text: t.text }],
+      })),
+      inferenceConfig: { maxTokens: 300, temperature: 0.6 },
+    }),
   );
 
-  if (!res.ok) {
-    throw new Error(`Workers AI ${res.status}: ${(await res.text()).slice(0, 200)}`);
-  }
-  const json = (await res.json()) as { choices?: { message?: { content?: string } }[] };
-  const content = json.choices?.[0]?.message?.content?.trim();
-  if (!content) throw new Error("Workers AI returned no content");
+  const content = res.output?.message?.content
+    ?.map((block) => block.text ?? "")
+    .join("")
+    .trim();
+  if (!content) throw new Error("Bedrock returned no content");
   return content;
 }
 
@@ -189,17 +192,17 @@ export async function askAunty(
 ): Promise<AuntyReply> {
   if (isCrisis(question)) return { body: CRISIS_REPLY, handoff: "crisis", mocked: false };
 
-  const messages: ChatMessage[] = [
-    { role: "system", content: auntyPersona(guidance, memberName) },
-    ...history.slice(-HISTORY_LIMIT).map((m) => ({
-      role: m.author === "aunty" ? ("assistant" as const) : ("user" as const),
-      content: m.body,
-    })),
-    { role: "user", content: question },
-  ];
+  const turns: ChatTurn[] = history.slice(-HISTORY_LIMIT).map((m) => ({
+    role: m.author === "aunty" ? ("assistant" as const) : ("user" as const),
+    text: m.body,
+  }));
+  // Converse rejects a conversation that opens on the assistant, which a
+  // window boundary can produce.
+  while (turns[0]?.role === "assistant") turns.shift();
+  turns.push({ role: "user", text: question });
 
   try {
-    const raw = await runWorkersAI(messages);
+    const raw = await runBedrock(auntyPersona(guidance, memberName), turns);
     const { body, handoff } = splitHandoff(raw);
     return { body, handoff, mocked: false };
   } catch (err) {

@@ -137,6 +137,7 @@ shown at `/admin/outbox` (the PRD's fallback). To go live, set these in `.env`
 | --- | --- |
 | `SNS_ENABLED=true`, `AWS_REGION=ap-southeast-2`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, optional `SNS_SENDER_ID` | OTP codes and reminders are sent by AWS SNS SMS |
 | `APNS_KEY_ID`, `APNS_TEAM_ID`, `APNS_BUNDLE_ID`, `APNS_PRIVATE_KEY` (the .p8 contents; `\n` escapes allowed), `APNS_PRODUCTION` | Push via APNs token auth (sandbox unless `APNS_PRODUCTION=true`) |
+| `BEDROCK_MODEL_ID` (plus the usual AWS credentials and `AWS_REGION`) | The AI Aunty answers from Amazon Bedrock instead of her canned demo lines |
 
 Delivery is still logged to the outbox when live. In the SNS sandbox, verify the
 demo phone numbers first. Leave `DEMO_OTP_CODE` empty outside the demo.
@@ -160,6 +161,47 @@ confirms in airplane mode and it syncs on reconnect → book Ray (SMS only) and
 press **Send due reminders now**; his SMS appears in `/admin/outbox` → open
 `/provider/insights`.
 
+## AI Aunty
+
+A private one-to-one chat with a bot that yarns like a community Aunty. The
+Elders of each group decide whether their mob has one at all and write, in their
+own words, what she should know — both on the group's `/elder` page. They cannot
+read anyone's conversation; no endpoint returns a thread the caller does not own.
+
+She is told to say plainly that she is a computer and not a real Elder, to stay
+out of cultural knowledge, and to hand over rather than answer on health, sorry
+business and culture. Those handovers render as a "go and see a real person"
+panel in the app. **Crisis talk is screened on the server from the member's own
+words before any model call**, so the 13YARN and Lifeline numbers do not depend
+on the model behaving (`lib/aunty.ts`, covered by `tests/aunty.test.ts`).
+
+Inference runs on Amazon Bedrock in ap-southeast-2. Point `BEDROCK_MODEL_ID` at
+a Sydney inference profile rather than a global one, so the model call stays
+onshore. Newer models reject the bare model ID, so use the profile form:
+
+```sh
+aws bedrock list-inference-profiles --region ap-southeast-2
+```
+
+To switch her on in the deployed Worker, add `BEDROCK_MODEL_ID` and
+`AWS_REGION` to `vars` in `wrangler.jsonc`, and store the keys of an IAM user
+allowed to call `bedrock:InvokeModel` as Worker secrets:
+
+```sh
+pnpm exec wrangler secret put AWS_ACCESS_KEY_ID
+pnpm exec wrangler secret put AWS_SECRET_ACCESS_KEY
+```
+
+Workers have no AWS credential chain (no IAM role, no `~/.aws`), so the SDK
+clients are given these keys explicitly by `lib/aws.ts`. SNS uses the same keys.
+
+With `BEDROCK_MODEL_ID` unset she replies from built-in canned lines (marked
+`mocked` in the API), so the demo runs with no AWS credentials at all.
+
+**Demo it:** `/elder/<groupId>` → **AI Aunty** → tick the box, write a line of
+guidance, **Save**. Then in the app: **Community** → the group → **Yarn with
+Aunty** (the speech-bubble icon).
+
 ## How the PRD's guarantees are enforced
 
 - **Community scoping:** content rows carry `communityId`; `scopedDb()` in
@@ -175,5 +217,8 @@ press **Send due reminders now**; his SMS appears in `/admin/outbox` → open
 - **Offline / satellite sync:** `/api/sync` and `/api/sync/lite` apply queued
   writes idempotently by `clientMutationId` (`lib/mutations.ts`); lite responses
   are text-only, gzip, typically well under 1 KB.
+- **AI Aunty stays private:** inference is Bedrock in ap-southeast-2; threads
+  are scoped to the owning user, so Elders govern whether she exists without
+  being able to read a word of her yarns.
 
 See also [docs/breach-response.md](docs/breach-response.md).

@@ -24,6 +24,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@aws-sdk/client-bedrock-runtime": "^3.1160.0",
     "@aws-sdk/client-sns": "^3.1159.0",
     "@formatjs/icu-messageformat-parser": "^3.5.22",
     "@opennextjs/cloudflare": "1.20.15",
