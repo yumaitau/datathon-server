@@ -3,7 +3,7 @@ import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { nextCookies } from "better-auth/next-js";
 import { bearer, phoneNumber } from "better-auth/plugins";
-import { db } from "@/lib/db";
+import { databaseProvider, db } from "@/lib/db";
 import { sendSms } from "@/lib/notify";
 
 const OTP_TTL_MS = 5 * 60 * 1000;
@@ -52,7 +52,7 @@ export async function checkOtp(phone: string, code: string) {
 }
 
 export const auth = betterAuth({
-  database: prismaAdapter(db, { provider: "postgresql" }),
+  database: prismaAdapter(db, { provider: databaseProvider }),
   // Extra web origins (e.g. a LAN address for a phone on the same Wi-Fi).
   trustedOrigins: (process.env.TRUSTED_ORIGINS ?? "").split(",").filter(Boolean),
   session: { expiresIn: 60 * 60 * 24 * 60, updateAge: 60 * 60 * 24 },

@@ -1,16 +1,16 @@
 import { getTranslations } from "next-intl/server";
 import { SubmitButton } from "@/components/submit-button";
-import { Badge, Card, EmptyState } from "@/components/ui";
+import { Badge, Card, EmptyState, Field, inputClass } from "@/components/ui";
 import { ageOf } from "@/lib/api";
 import { db } from "@/lib/db";
-import { membershipAction, postAction, providerAction, reportAction } from "../actions";
+import { auntyAction, membershipAction, postAction, providerAction, reportAction } from "../actions";
 
 const when = (d: Date) => d.toLocaleString("en-AU", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
 
 export default async function ElderQueue({ params }: PageProps<"/elder/[groupId]">) {
   const { groupId } = await params;
   const t = await getTranslations("elder");
-  const [members, posts, providers, reports, pinned] = await Promise.all([
+  const [members, posts, providers, reports, pinned, aunty] = await Promise.all([
     db.membership.findMany({ where: { groupId, status: "pending" }, include: { user: true }, orderBy: { createdAt: "asc" } }),
     db.post.findMany({ where: { groupId, status: "published" }, include: { author: true }, orderBy: { createdAt: "desc" }, take: 10 }),
     db.providerGroupAccess.findMany({ where: { groupId, status: "requested" }, include: { provider: true } }),
@@ -19,6 +19,7 @@ export default async function ElderQueue({ params }: PageProps<"/elder/[groupId]
       include: { comment: { include: { author: true } } },
     }),
     db.post.findMany({ where: { groupId, status: "published", pinned: true }, orderBy: { createdAt: "desc" } }),
+    db.auntySetting.findUnique({ where: { groupId } }),
   ]);
 
   return (
@@ -115,6 +116,38 @@ export default async function ElderQueue({ params }: PageProps<"/elder/[groupId]
             ))}
           </ul>
         )}
+      </Card>
+
+      <Card title={t("aunty")} description={t("auntyHint")}>
+        <form action={auntyAction} className="flex flex-col gap-4">
+          <input type="hidden" name="groupId" value={groupId} />
+          <label className="flex items-start gap-3 text-sm">
+            <input
+              type="checkbox"
+              name="enabled"
+              defaultChecked={aunty?.enabled ?? false}
+              className="mt-0.5 size-4 shrink-0 rounded border-line-strong accent-accent"
+            />
+            <span className="flex flex-col gap-0.5">
+              <span className="font-medium">{t("auntyEnable")}</span>
+              <span className="text-xs text-ink-faint">{t("auntyEnableHint")}</span>
+            </span>
+          </label>
+          <Field label={t("auntyGuidance")} hint={t("auntyGuidanceHint")}>
+            <textarea
+              name="guidance"
+              rows={4}
+              defaultValue={aunty?.guidance ?? ""}
+              maxLength={2000}
+              placeholder={t("auntyGuidancePlaceholder")}
+              className={`${inputClass} h-auto py-2 leading-relaxed`}
+            />
+          </Field>
+          <p className="rounded-lg bg-sunken px-3 py-2 text-xs text-ink-muted">{t("auntyPrivacy")}</p>
+          <div>
+            <SubmitButton size="sm">{t("auntySave")}</SubmitButton>
+          </div>
+        </form>
       </Card>
 
       <Card title={t("pinned")} description={t("pinnedHint")}>

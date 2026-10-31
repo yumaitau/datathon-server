@@ -9,11 +9,14 @@ const eslintConfig = defineConfig([
   globalIgnores([
     // Default ignores of eslint-config-next:
     ".next/**",
+    ".open-next/**",
+    ".wrangler/**",
     "out/**",
     "build/**",
     "next-env.d.ts",
     // Generated: Prisma client and the copied MapLibre worker.
     "generated/**",
+    "cloudflare-env.d.ts",
     "public/maplibre-gl-worker.mjs",
   ]),
 ]);

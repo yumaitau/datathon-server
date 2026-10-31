@@ -45,11 +45,6 @@ async function TopBar() {
   );
 }
 
-// Every portal page reads the session, which can't be part of a static shell.
-// Let navigations into the portals block on the server instead of validating
-// each authenticated route for instant navigation.
-export const instant = false;
-
 export default function PortalLayout({ children }: LayoutProps<"/">) {
   return (
     <>

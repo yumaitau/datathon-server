@@ -42,6 +42,8 @@ model User {
   carers          CarerLink[]      @relation("CarerLinkPerson")
   nominations     ElderNomination[] @relation("Nominee")
   activities      Activity[]
+  auntyThreads    AuntyThread[]
+  auntySettingEdits AuntySetting[]  @relation("AuntySettingEditor")
 
   @@map("user")
 }
@@ -161,6 +163,8 @@ model Group {
   providerAccess ProviderGroupAccess[]
   nominations   ElderNomination[]
   languages     Language[]
+  auntySetting  AuntySetting?
+  auntyThreads  AuntyThread[]
 
   @@index([communityId])
 }
@@ -646,4 +650,67 @@ model Translation {
   language Language @relation(fields: [languageId], references: [id], onDelete: Cascade)
 
   @@unique([languageId, key])
+}
+
+// ---------- AI Aunty ----------
+
+enum AuntyAuthor {
+  member
+  aunty
+}
+
+/// Per-group Elder control over the AI Aunty. Elders decide whether their
+/// community has one at all and what it is told about yarning with their mob;
+/// they never see anyone's conversation.
+model AuntySetting {
+  id          String   @id @default(cuid())
+  communityId String?
+  groupId     String   @unique
+  enabled     Boolean  @default(false)
+  /// Elder-written brief folded into the system prompt. Free text, in the
+  /// Elders' own words, e.g. who to send people to for sorry business.
+  guidance    String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  group     Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  updatedBy User? @relation("AuntySettingEditor", fields: [updatedById], references: [id])
+}
+
+/// One person's private yarn with the Aunty in one group. Readable only by the
+/// person it belongs to — Elders and admins have no route to it.
+model AuntyThread {
+  id          String   @id @default(cuid())
+  communityId String?
+  groupId     String
+  userId      String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  group    Group          @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user     User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages AuntyMessage[]
+
+  @@unique([groupId, userId])
+  @@index([communityId, updatedAt])
+}
+
+model AuntyMessage {
+  id               String      @id @default(cuid())
+  communityId      String?
+  threadId         String
+  author           AuntyAuthor
+  body             String
+  /// Set when the Aunty stepped back and pointed to a real person instead
+  /// (e.g. "health", "sorry_business"). Drives the handover card in the app.
+  handoff          String?
+  /// True when no model was configured and this is the built-in demo reply.
+  mocked           Boolean     @default(false)
+  clientMutationId String?     @unique
+  createdAt        DateTime    @default(now())
+
+  thread AuntyThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  @@index([threadId, createdAt])
 }

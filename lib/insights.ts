@@ -4,6 +4,10 @@ import { db } from "@/lib/db";
 // Provider views already apply the minimum cell size; a null count means "<5".
 
 const num = (v: unknown) => (v == null ? null : Number(v));
+const asDate = (value: Date | string | number) =>
+  value instanceof Date ? value : new Date(value);
+const isoDay = (value: Date | string | number) =>
+  asDate(value).toISOString().slice(0, 10);
 
 export type Cell = number | null;
 
@@ -13,7 +17,7 @@ export async function dnaWeekly(providerId: string) {
   >`SELECT week, community_id, community_name, total, missed, dna_rate
       FROM v_dna_weekly WHERE provider_id = ${providerId} ORDER BY week`;
   return rows.map((r) => ({
-    week: r.week.toISOString().slice(0, 10),
+    week: isoDay(r.week),
     communityId: r.community_id,
     community: r.community_name,
     total: num(r.total),
@@ -68,20 +72,20 @@ export async function reminderEffectiveness(providerId: string) {
 export async function weeklyActive(communityId: string) {
   const rows = await db.$queryRaw<{ week: Date; active_members: unknown }[]>`
     SELECT week, active_members FROM v_weekly_active WHERE community_id = ${communityId} ORDER BY week`;
-  return rows.map((r) => ({ week: r.week.toISOString().slice(0, 10), active: Number(r.active_members) }));
+  return rows.map((r) => ({ week: isoDay(r.week), active: Number(r.active_members) }));
 }
 
 export async function topEvents(communityId: string, limit = 8) {
   const rows = await db.$queryRaw<
     { event_id: string; title: string; category: string; starts_at: Date; going: unknown; maybe: unknown; declined: unknown }[]
   >`SELECT event_id, title, category, starts_at, going, maybe, declined FROM v_event_rsvps
-     WHERE community_id = ${communityId} AND starts_at < now()
+     WHERE community_id = ${communityId} AND starts_at < CURRENT_TIMESTAMP
      ORDER BY going DESC, starts_at DESC LIMIT ${limit}`;
   return rows.map((r) => ({
     id: r.event_id,
     title: r.title,
     category: r.category,
-    startsAt: r.starts_at,
+    startsAt: asDate(r.starts_at),
     going: Number(r.going),
     maybe: Number(r.maybe),
     declined: Number(r.declined),
@@ -94,7 +98,7 @@ export async function postApprovals(communityId: string) {
   >`SELECT week, submitted, published, rejected, pending, avg_hours_to_decision FROM v_post_approvals
      WHERE community_id = ${communityId} ORDER BY week`;
   return rows.map((r) => ({
-    week: r.week.toISOString().slice(0, 10),
+    week: isoDay(r.week),
     submitted: Number(r.submitted),
     published: Number(r.published),
     rejected: Number(r.rejected),

@@ -50,6 +50,24 @@ pnpm dev
 | `pnpm smoke [url]` | End-to-end check of both demo flows against a running, freshly seeded server |
 | `pnpm db:seed` | Wipe and reload demo data |
 
+## Cloudflare Workers and D1
+
+The production Worker runs at <https://mymob.yumait.au> and binds the
+`mymob-db` D1 database as `DB`. The Cloudflare build generates a separate
+SQLite Prisma client, so the local Docker/PostgreSQL workflow remains
+unchanged.
+
+```bash
+pnpm db:d1:migrate       # apply pending migrations to production D1
+pnpm cf:preview          # build and run locally with workerd
+pnpm cf:deploy           # build and deploy mymob-server
+```
+
+`BETTER_AUTH_SECRET` and `CRON_SECRET` are Worker secrets. Non-secret runtime
+configuration, the custom domain, and the D1 binding live in `wrangler.jsonc`.
+The deployed demo authentication continues to accept OTP `123456` for the
+seeded demo phone numbers.
+
 ## Community languages
 
 Communities can translate MyMob (web portals and the iOS app) into their own

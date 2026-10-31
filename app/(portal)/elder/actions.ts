@@ -40,6 +40,33 @@ export async function reportAction(form: FormData) {
   done();
 }
 
+/**
+ * Elders switch the AI Aunty on for their group and write the brief she works
+ * to. They never get a route to anyone's conversation — only to the voice.
+ */
+export async function auntyAction(form: FormData) {
+  const actor = await requireWebActor("elder");
+  const groupId = String(form.get("groupId"));
+  await requireElder(actor, groupId);
+  const enabled = form.get("enabled") === "on";
+  const guidance = String(form.get("guidance") ?? "").trim().slice(0, 2000);
+  const group = await db.group.findUniqueOrThrow({ where: { id: groupId } });
+
+  await db.auntySetting.upsert({
+    where: { groupId },
+    create: {
+      groupId,
+      communityId: group.communityId,
+      enabled,
+      guidance: guidance || null,
+      updatedById: actor.user.id,
+    },
+    update: { enabled, guidance: guidance || null, updatedById: actor.user.id },
+  });
+  await audit(actor.user.id, enabled ? "aunty.enable" : "aunty.disable", "Group", groupId);
+  done();
+}
+
 export async function nominateAction(_: unknown, form: FormData) {
   return formResult(async () => {
     const actor = await requireWebActor("elder");

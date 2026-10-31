@@ -1,0 +1,45 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "mymob-server",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-10-30",
+  "compatibility_flags": [
+    "nodejs_compat",
+    "global_fetch_strictly_public"
+  ],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "services": [
+    {
+      "binding": "WORKER_SELF_REFERENCE",
+      "service": "mymob-server"
+    }
+  ],
+  "routes": [
+    {
+      "pattern": "mymob.yumait.au",
+      "custom_domain": true
+    }
+  ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "mymob-db",
+      "database_id": "ecb04539-e4f9-4788-babb-028849fadce8",
+      "migrations_dir": "d1/migrations"
+    }
+  ],
+  "vars": {
+    "DATABASE_PROVIDER": "d1",
+    "DEMO_OTP_CODE": "123456",
+    "APP_TIMEZONE": "Australia/Darwin",
+    "SNS_ENABLED": "false",
+    "BETTER_AUTH_URL": "https://mymob.yumait.au",
+    "TRUSTED_ORIGINS": "https://mymob.yumait.au"
+  },
+  "observability": {
+    "enabled": true
+  }
+}
