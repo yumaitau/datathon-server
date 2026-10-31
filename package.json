@@ -15,7 +15,7 @@
     "db:seed": "prisma db seed",
     "db:d1:migrate": "wrangler d1 migrations apply mymob-db --remote",
     "db:d1:migrate:local": "wrangler d1 migrations apply mymob-db --local",
-    "cf:schema": "node scripts/generate-d1-schema.mjs && DATABASE_URL=file:./local.db prisma generate --schema prisma/schema.d1.prisma",
+    "cf:schema": "DATABASE_URL=postgresql://build:build@localhost:5432/build prisma generate && node scripts/generate-d1-schema.mjs && DATABASE_URL=file:./local.db prisma generate --schema prisma/schema.d1.prisma",
     "cf:typegen": "wrangler types --env-interface CloudflareEnv --strict-vars false cloudflare-env.d.ts",
     "cf:build": "DATABASE_PROVIDER=d1 opennextjs-cloudflare build",
     "cf:preview": "pnpm cf:build && opennextjs-cloudflare preview",
